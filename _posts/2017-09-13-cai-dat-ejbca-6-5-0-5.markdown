@@ -1,0 +1,127 @@
+---
+layout: post
+title: Cài đặt EJBCA  6.5.0 - Phần 1
+image: "/content/images/2017/09/ejbca-logo.jpg"
+date: '2017-09-13 17:24:58'
+tags:
+- ejbca
+- rootca
+- subca
+- certificate
+- openca
+---
+
+Do trường mình có học môn chứng thực điện tử và có yêu cầu dựng Lab với mô hình 1 RootCA  và 2 SubCA. Sau khi thử nghiệm khá nhiều các phần mềm như OpenCA, OpenXPKI, M$ CA và cuối cùng là EJBCA thì mình chọn EJBCA để viết bài về nó. Hy vọng sau khi xong loạt bài, mình có thể xây dựng được mô hình trên. Do vậy mình không dám chắc mình có thể làm được ở thời điểm hiện tại. 
+
+**Chuẩn bị**
+
+- Ubuntu Server 16.04
+- Mã nguồn EJBCA 6.5.0 - [Link download](https://drive.google.com/file/d/0BwVyZh184-20Q253cDlFakJxbGs/view?usp=sharing)
+- JBoss 6.4.0 - [Link Download](https://drive.google.com/file/d/0BwVyZh184-20S2JfN011ZTZBMFE/view?usp=sharing)
+
+**Tiến hành cài đặt**
+
+- SSH vào Server thực hiện giải nén ejbca và jboos 
+
+<img src="https://i.imgur.com/7wrxaZC.png">
+
+- Khai báo đường dẫn jboss cho ejbca
+
+Ví dụ ở đây jboss của tôi đang ở đường dẫn `/root/jboss-eap-6.4` và ejbca ở đường dẫn `/root/ejbca_ce_6_5.0.5`
+
+Thực hiện như sau
+
+```
+echo "appserver.home=/root/jboss-eap-6.4" > /root/ejbca_ce_6_5.0.5/conf/ejbca.properties
+```
+
+- Di chuyển vào thư mục jboss và start jboss ở chế độ standalone
+
+```
+cd /root/jboss-eap-6.4/
+./bin/standalone.sh
+```
+
+Như này đã start thành công 
+
+<img src="https://i.imgur.com/3xiG2wy.png">
+
+- Mở một cửa sổ terminal khác, hoặc có thể sử dụng byobu như [bài viết này](https://sapham.net/su-dung-byobu-de-quay-tren-terminal-awesome-with-byobu/) để mở 1 windows mới dễ dàng hơn. 
+
+- Di chuyển vào thư mục ejbca, thực hiện deploy
+
+```
+cd /root/ejbca_ce_6_5.0.5/
+ant deploy
+```
+
+Lưu ý: Ở bước này có đoạn nhập password cho database, cứ enter cho nhanh nhé
+
+<img src="https://i.imgur.com/LQieYiD.png)">
+
+Kết quả deploy thành công như sau
+
+<img src="https://i.imgur.com/AbRzbzE.png">
+
+- Tiếp tục cài đặt
+
+```
+ant install
+```
+
+Lưu ý: Ở bước này là bước thiết lập CA đầu tiên, ta cứ enter cho nhanh nhé.
+
+<img src="https://i.imgur.com/BX0E9M2.png)">
+
+Install thành công thì nó sẽ báo như này
+
+<img src="https://i.imgur.com/ehkRKY7.png">
+
+- Khởi động lại Jboss: chuyển sang terminal/windows chạy Jboss, thực hiện restart Jboss bằng cách 
+
+```
+ctrl + C
+```
+Sau đó chạy lại
+
+```
+./bin/standalone.sh
+```
+
+- Kiểm tra port đã listen chưa để chắc chắn đẫ cài thành công 
+
+```
+netstat -lntp
+```
+
+Kết quả như sau tức là đã thành công
+
+<img src="https://i.imgur.com/rplFkFN.png)">
+
+- Tải về admin keystore, nằm tại đường dẫn `/root/ejbca_ce_6_5.0.5/p12/superadmin.p12`
+
+Có thể sử dụng các công cụ `scp`, `winscp`, `python - SimpleHTTPServer` để kéo file này về client
+
+- Import vào trình duyệt
+
+*Đối với Chrome: Settings -> Show advanced settings -> Manage certificates -> Your Certificates -> Import*
+
+*Đối với Firefox: Preferences -> Advanced -> Certificates -> View Certificates -> Your Certificates -> Import*
+
+- Truy cập vào web ejbca tại đường dẫn
+
+`https://<địa chỉ IP>:>8443/ejbca`
+
+Hiện ra như này là OK 
+
+<img src="https://i.imgur.com/k4UnT26.png">
+
+
+**Kết luận**
+
+- Để thực hiện bài mô phỏng như lúc đầu, ta cần thực hiện cài đặt 3 máy tuơng tự như này. Mình sẽ viết phần cấu hình đó ở bài 2.
+
+
+
+
+

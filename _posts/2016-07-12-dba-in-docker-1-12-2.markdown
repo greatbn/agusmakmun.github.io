@@ -1,0 +1,230 @@
+---
+layout: post
+title: DAB  (Distributed Application Bundle) trên Docker 1.12
+image: "/content/images/2016/07/download.png"
+date: '2016-07-12 16:28:09'
+tags:
+- docker
+- docker-1-12
+- swarm-mode
+- experiment
+---
+
+
+Docker 1.12 đã giới thiệu một khái niệm mới đó là Distributed Application Bundle (DAB). Docker-compose là một tool rất tuyệt để tạo ra một stack các services, Tôi đang xem xét Compose và DAB có liên quan như thế nào. DAB có thay thế được Compose? Sự thật DAB file có thể được tạo từ Compose file và sau đó sẽ triển khai trên một Cluster.
+
+Sau đây tôi sẽ demo nó làm việc như thế nào.
+
+Tôi sẽ sử dụng một Ứng dụng Wordpress đơn giản.
+Gồm 2 service là wordpress và database mysql
+
+App được định nghĩa trong file docker-compose sau
+
+```
+version: "2"
+services:
+  db:
+    image: mariadb
+    volumes:
+      - ./sql-data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=sapham.net
+      - MYSQL_USER=sapham
+      - MYSQL_PASSWORD=sapham.net
+      - MYSQL_DATABASE=wordpress
+    networks:
+      - app-net
+  wordpress:
+    image: wordpress:4.5
+    ports:
+      - 80:80
+    environment:
+      - WORDPRESS_DB_HOST=db
+      - WORDPRESS_DB_USER=sapham
+      - WORDPRESS_DB_PASSWORD=sapham.net
+      - WORDPRESS_DB_NAME=wordpress
+    networks:
+      - app-net
+    depends_on:
+      - db
+networks:
+  app-net:
+
+```
+
+Run app `docker-compose up`
+
+```
+root@docker1:~/demo# docker-compose up
+Creating network "demo_app-net" with the default driver
+Starting demo_db_1
+Starting demo_wordpress_1
+Attaching to demo_db_1, demo_wordpress_1
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] mysqld (mysqld 10.1.14-MariaDB-1~jessie) starting as process 1 ...
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: Using mutexes to ref count buffer pool pages
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: The InnoDB memory heap is disabled
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: Mutexes and rw_locks use GCC atomic builtins
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: Memory barrier is not used
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: Compressed tables use zlib 1.2.8
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: Using Linux native AIO
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: Using SSE crc32 instructions
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: Initializing buffer pool, size = 256.0M
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: Completed initialization of buffer pool
+db_1         | 2016-07-12 15:57:43 140063423559616 [Note] InnoDB: Highest supported file format is Barracuda.
+wordpress_1  |
+wordpress_1  | MySQL Connection Error: (2002) Connection refused
+wordpress_1  |
+wordpress_1  | Warning: mysqli::mysqli(): (HY000/2002): Connection refused in - on line 10
+db_1         | 2016-07-12 15:57:44 140063423559616 [Note] InnoDB: 128 rollback segment(s) are active.
+db_1         | 2016-07-12 15:57:44 140063423559616 [Note] InnoDB: Waiting for purge to start
+db_1         | 2016-07-12 15:57:44 140063423559616 [Note] InnoDB:  Percona XtraDB (http://www.percona.com) 5.6.29-76.2 started; log sequence number 2938072
+db_1         | 2016-07-12 15:57:45 140062654170880 [Note] InnoDB: Dumping buffer pool(s) not yet started
+db_1         | 2016-07-12 15:57:45 140063423559616 [Note] Plugin 'FEEDBACK' is disabled.
+db_1         | 2016-07-12 15:57:45 140063423559616 [Note] Server socket created on IP: '::'.
+db_1         | 2016-07-12 15:57:45 140063423559616 [Warning] 'proxies_priv' entry '@% root@f2b897ff7bbf' ignored in --skip-name-resolve mode.
+db_1         | 2016-07-12 15:57:45 140063423559616 [Note] mysqld: ready for connections.
+db_1         | Version: '10.1.14-MariaDB-1~jessie'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  mariadb.org binary distribution
+wordpress_1  | AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 172.19.0.3. Set the 'ServerName' directive globally to suppress this message
+wordpress_1  | AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 172.19.0.3. Set the 'ServerName' directive globally to suppress this message
+wordpress_1  | [Tue Jul 12 15:57:47.388920 2016] [mpm_prefork:notice] [pid 1] AH00163: Apache/2.4.10 (Debian) PHP/5.6.23 configured -- resuming normal operations
+wordpress_1  | [Tue Jul 12 15:57:47.389266 2016] [core:notice] [pid 1] AH00094: Command line: 'apache2 -D FOREGROUND'
+
+```
+
+Khi run compose file ta có
+
+- Tạo 1 network mới là demo_app-net
+- Tạo 1 container mariadb là demo_db_1
+- Tạo volume cho mariadb
+- Tạo 1 container wordpress là demo_wordpress_1
+
+Ta có thể truy cập vào web bằng địa chỉ IP của server để setup Wordpress
+
+<img src="http://i.imgur.com/8s6Yb1c.png">
+
+
+######DAB
+
+Tiếp theo ta sẽ tạo 1 bundle
+Ở tại thư mục chức compose file thực hiện command `docker-compose bundle`
+
+```
+root@docker1:~/demo# docker-compose bundle
+WARNING: Unsupported top level key 'networks' - ignoring
+WARNING: Unsupported key 'depends_on' in services.wordpress - ignoring
+WARNING: Unsupported key 'volumes' in services.db - ignoring
+Wrote bundle to demo.dab
+```
+
+Ở đây tôi đã thực hiện câu lệnh này và các image đã được tải sẵn do vậy nếu chưa tải image nó sẽ hỏi và mình chọn `Y`
+Ta thấy xuất hiện file `demo.dab`
+
+```
+root@docker1:~/demo# cat demo.dab
+{
+  "Services": {
+    "db": {
+      "Env": [
+        "MYSQL_ROOT_PASSWORD=sapham.net",
+        "MYSQL_PASSWORD=sapham.net",
+        "MYSQL_USER=sapham",
+        "MYSQL_DATABASE=wordpress"
+      ],
+      "Image": "mariadb@sha256:358f6b50afd9c25707e97869f0c57de802c53973a90a2ff49e283501fccce1b2",
+      "Networks": [
+        "app-net"
+      ]
+    },
+    "wordpress": {
+      "Env": [
+        "WORDPRESS_DB_HOST=db",
+        "WORDPRESS_DB_PASSWORD=sapham.net",
+        "WORDPRESS_DB_USER=sapham",
+        "WORDPRESS_DB_NAME=wordpress"
+      ],
+      "Image": "wordpress@sha256:7bb9549fb6d80c230bec2da6bd181be8f30e5199687e53e5ad5744a3144eae1b",
+      "Networks": [
+        "app-net"
+      ],
+      "Ports": [
+        {
+          "Port": 80,
+          "Protocol": "tcp"
+        }
+      ]
+    }
+  },
+  "Version": "0.1"
+}root@docker1:~/demo#
+
+```
+
+Nhìn vào nội dung ta thấy nó ở định dạng json. Có rất nhiều điểm tương tự với file compose ban đầu. Có một sự chú ý ở đây đó chính là image chứa nội dung hash sha256.  Điều này chắc chắn rằng khi bạn sử dụng bundle file này để deploy mới. Nó sẽ sử dụng chính xác image khi tạo bundle ngay cả khi tag image đó có phiên bản mới hơn.
+
+Một điều quan trọng nữa là port của `wordpress` không được mapping, không giống với file compose ban đầu.
+
+Thực hiện setup một swarm cluster sử dụng `swarm mode` như tôi đã thực hiện ở [bài trước](https://sapham.net/trai-nghiem-cac-tinh-nang-moi-tren-docker-1-12/)
+
+
+
+Tôi stop các app trên compose file và kiểm tra các node trong cluster
+
+```
+}root@docker1:~/demo# docker-compose stop
+Stopping demo_wordpress_1 ... done
+Stopping demo_db_1 ... done
+root@docker1:~/demo# docker node list
+ID                           HOSTNAME  MEMBERSHIP  STATUS  AVAILABILITY  MANAGER STATUS
+7ayo57yx6exapj378fm71vnxa *  docker1   Accepted    Ready   Active        Leader
+bb829i2ot92fwhsqjgmbof000    docker2   Accepted    Ready   Active        
+root@docker1:~/demo#
+
+```
+Thực hiện deploy bundle bằng lệnh `docker deploy <name of dab file>`
+
+```
+root@docker1:~/demo# docker deploy demo
+Loading bundle from demo.dab
+Creating network demo_app-net
+Creating service demo_db
+Creating service demo_wordpress
+root@docker1:~/demo#
+```
+
+Ok. ta sẽ kiểm tra các service đang chạy
+
+```
+root@docker1:~/demo# docker service list
+ID            NAME            REPLICAS  IMAGE                                                                              COMMAND
+97fnowhuf4as  demo_wordpress  1/1       wordpress@sha256:7bb9549fb6d80c230bec2da6bd181be8f30e5199687e53e5ad5744a3144eae1b  
+f0zggpjs33yk  demo_db         0/1       mariadb@sha256:358f6b50afd9c25707e97869f0c57de802c53973a90a2ff49e283501fccce1b2    
+root@docker1:~/demo#
+```
+
+Để có thể mapping port cho wordpress tôi thực hiện update service
+
+```
+root@docker1:~/demo# docker service update -p 80:80 demo_wordpress
+demo_wordpress
+root@docker1:~/demo#
+```
+
+
+Giờ ta có thể truy cập vào wordpress
+
+<img src="http://i.imgur.com/AyZVKF8.png">
+
+######Stack
+
+Docker 1.12 cũng giới thiệu 1 command mới là `docker stack`. Khi deploy 1 app từ bundle 1 stack được tạo mới. Ta có thể chỉnh sửa stack này thông qua `docker stack` command
+
+Tôi sẽ thực hiện xóa stack này
+
+```
+root@docker1:~/demo# docker stack rm  demo
+Removing service demo_wordpress
+Removing service demo_db
+Removing network demo_app-net
+```
+
+Tổng kết: Ở phiên bản thử nghiệm này có một số điểm mới mà khá là hay, nhưng có một số vấn đề về loadbalancer tôi thấy vẫn chưa được tốt cho lắm. Hy vọng ta có thể chỉnh sửa được các thuật toán loadbalancing cũng như cải thiện tốt hơn ở phiên bản sau.
